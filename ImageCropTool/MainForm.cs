@@ -222,6 +222,7 @@ namespace ImageCropTool
         {
             // 기준선/점/크롭 전체 제거
             baseLines.Clear();
+            clickState = ClickState.None;
             currentLine = null;
 
             // 드래그/hover 상태 초기화
@@ -255,6 +256,7 @@ namespace ImageCropTool
                 (pictureBoxImage.Width - displayBitmap.Width) / 2f,
                 (pictureBoxImage.Height - displayBitmap.Height) / 2f
             );
+            pictureBoxMiniMap.Invalidate();
         }
 
 
@@ -283,6 +285,7 @@ namespace ImageCropTool
                 dragTarget = DragTarget.None;
             }
             UpdateLineInfo(null);
+            pictureBoxMiniMap.Invalidate();
             pictureBoxImage.Invalidate();
         }
 
