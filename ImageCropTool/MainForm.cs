@@ -39,7 +39,6 @@ namespace ImageCropTool
         private CropBoxInfo hoveredBox = null;                             // hover된 크롭박스 (모든 기준선 통합)
 
         /* ======== Image ========== */
-        private Bitmap viewBitmap;
         private Bitmap displayBitmap = null;
         private Mat originalMat;
         private string imageColorInfoText = string.Empty;
@@ -170,8 +169,8 @@ namespace ImageCropTool
             //long inPageFile = privateBytes - workingSet;     // 가상메모리 데이터                                           // 
 
             return $"WS: {workingSet / 1024 / 1024} MB | " +
-                   $"Private: {privateBytes / 1024 / 1024} MB | " +
-                   $"Managed: {managed / 1024 / 1024} MB";
+                   $"Private: {privateBytes / 1024 / 1024} MB";
+                   //$"Managed: {managed / 1024 / 1024} MB";
         }
 
 
@@ -180,16 +179,13 @@ namespace ImageCropTool
          * ========================================================= */
         private void BtnReset_Click(object sender, EventArgs e) => DataReset();
 
-        private void DisposeResources()
+        private void DisposeResources()  // 이미지 리소스 전부 해제
         {
             originalMat?.Dispose();
             originalMat = null;
 
             displayBitmap?.Dispose();
             displayBitmap = null;
-
-            viewBitmap?.Dispose();
-            viewBitmap = null;
 
             highZoomCache?.Dispose();
             highZoomCache = null;
@@ -242,6 +238,8 @@ namespace ImageCropTool
             // Crop size는 기본값으로
             numCropSize.Value = DefaultCropSize;
             zoomOutCacheBitmap?.Dispose();
+
+            pictureBoxMiniMap.Invalidate();
             pictureBoxImage.Invalidate();
         }
 
@@ -258,7 +256,6 @@ namespace ImageCropTool
             );
             pictureBoxMiniMap.Invalidate();
         }
-
 
         private void NumCropSize_ValueChanged(object sender, EventArgs e)
         {
@@ -321,10 +318,6 @@ namespace ImageCropTool
                     //originalMat = BitmapConverter.ToMat(originalBitmap);  // 연산용
 
                     originalMat = Cv2.ImRead(dlg.FileName, ImreadModes.Unchanged);
-                    //originalBitmap = BitmapConverter.ToBitmap(originalMat);
-
-                    //Console.WriteLine(originalMat.Total() * originalMat.ElemSize());
-                    //Console.WriteLine(originalBitmap.PixelFormat);
 
 
                     // 이미지 타입 판별
@@ -355,6 +348,7 @@ namespace ImageCropTool
                 btnLoadImage.Enabled = true;
                 btnReset.Enabled = true;
 
+                pictureBoxMiniMap.Invalidate();
                 pictureBoxImage.Invalidate();
             }
         }
@@ -396,7 +390,7 @@ namespace ImageCropTool
             if (originalMat == null)
                 return;
 
-            int maxSize = 200;
+            int maxSize = 200;   // 최대크기
 
             float scaleX = (float)maxSize / originalMat.Width;
             float scaleY = (float)maxSize / originalMat.Height;
@@ -408,14 +402,22 @@ namespace ImageCropTool
 
             using (Mat resized = new Mat())
             {
-                Cv2.Resize(originalMat, resized, new OpenCvSharp.Size(w, h));
+                Cv2.Resize(
+                    originalMat,
+                    resized,
+                    new OpenCvSharp.Size(w, h),
+                    0,
+                    0,
+                    InterpolationFlags.Area
+                );
 
                 miniMapBitmap?.Dispose();
                 miniMapBitmap = BitmapConverter.ToBitmap(resized);
             }
         }
+
         /* =========================================================
-         *  피라미드 관련
+         *  pyramid
          * ========================================================= */
         private void DisposePyramidCaches()
         {
@@ -495,11 +497,11 @@ namespace ImageCropTool
         }
         private void UpdateHighZoomCache()
         {
-            // 1. 원본 비트맵이 없거나 컨트롤 크기가 정상이 아닐 때 즉시 리턴
+            // 원본 비트맵이 없거나 컨트롤 크기가 정상이 아닐 때 즉시 리턴
             if (originalMat == null || pictureBoxImage.Width <= 0 || pictureBoxImage.Height <= 0)
                 return;
 
-            if (viewScale <= 2.0f)
+            if (viewScale <= 2.0f)   // 확대 2배 이상일때만
                 return;
 
             try
@@ -524,14 +526,14 @@ namespace ImageCropTool
                 // 이전 캐시 해제
                 highZoomCache?.Dispose();
 
-                //
+                // roi 생성
                 var roi = new OpenCvSharp.Rect(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height);
-                using (Mat cropped = new Mat(originalMat, roi))
+                using (Mat cropped = new Mat(originalMat, roi))    // 원본 Mat 참조
                 {
                     highZoomCache?.Dispose();
                     highZoomCache = BitmapConverter.ToBitmap(cropped);
                 }
-                lastHighZoomSrcRect = srcRect;
+                lastHighZoomSrcRect = srcRect;  // 같은 영역이면 재사용
             }
             catch (Exception ex)
             {
@@ -636,7 +638,7 @@ namespace ImageCropTool
                             currentLine = null;
                             clickState = ClickState.None;
                         }
-
+                        pictureBoxMiniMap.Invalidate();
                         pictureBoxImage.Invalidate();
                         break;
                     }
@@ -650,7 +652,6 @@ namespace ImageCropTool
                     }
             }
         }
-
 
         /* =========================================================
          *  Mouse Move
@@ -709,7 +710,6 @@ namespace ImageCropTool
             pictureBoxImage.Invalidate();
         }
 
-
         private void PictureBoxImage_MouseUp(object sender, MouseEventArgs e)
         {
 
@@ -738,7 +738,6 @@ namespace ImageCropTool
             pictureBoxMiniMap.Invalidate();
             pictureBoxImage.Invalidate();
         }
-
 
         /* =========================================================
          *  Paint
@@ -841,22 +840,15 @@ namespace ImageCropTool
 
             g.Clear(Color.Black);
 
-            float scaleX = (float)pictureBoxMiniMap.Width / originalMat.Width;
-            float scaleY = (float)pictureBoxMiniMap.Height / originalMat.Height;
-            float scale = Math.Min(scaleX, scaleY);
+            float scale = miniMapScale;
 
-            int w = (int)(originalMat.Width * scale);
-            int h = (int)(originalMat.Height * scale);
+            int offsetX = (pictureBoxMiniMap.Width - miniMapBitmap.Width) / 2;     // 중앙정렬
+            int offsetY = (pictureBoxMiniMap.Height - miniMapBitmap.Height) / 2;
 
-            int offsetX = (pictureBoxMiniMap.Width - w) / 2;
-            int offsetY = (pictureBoxMiniMap.Height - h) / 2;
-
-            g.DrawImage(miniMapBitmap, offsetX, offsetY, w, h);
-
-            DrawMiniMapViewport(g, scale, offsetX, offsetY);
+            g.DrawImage(miniMapBitmap, offsetX, offsetY);
+            DrawMiniMapViewport(g, scale, offsetX, offsetY);    // 현재 보고있는곳
+            DrawMiniMapGuideBoxes(g, scale, offsetX, offsetY);
         }
-
-
 
         /* =========================================================
          *  Draw Helpers
@@ -976,6 +968,33 @@ namespace ImageCropTool
                 }
             }
         }
+
+        private void DrawMiniMapGuideBoxes(Graphics g, float scale, int offsetX, int offsetY)
+        {
+            foreach (var line in baseLines)
+            {
+                foreach (var box in line.CropBoxes)
+                {
+                  
+
+                    using (Pen pen = new Pen(Color.Yellow, 2))
+                    {
+                        Rectangle r = box.EffectiveRect;
+
+                        PointF tl = OriginalToMiniMap(new PointF(r.Left, r.Top), scale, offsetX, offsetY);
+                        PointF br = OriginalToMiniMap(new PointF(r.Right, r.Bottom), scale, offsetX, offsetY);
+
+                        g.DrawRectangle(
+                            pen,
+                            tl.X,
+                            tl.Y,
+                            br.X - tl.X,
+                            br.Y - tl.Y
+                        );
+                    }
+                }
+            }
+        }
         private void DrawMemoryOverlay(Graphics g)
         {
             string text = GetMemoryInfo();
@@ -996,12 +1015,12 @@ namespace ImageCropTool
 
         private void DrawMiniMapViewport(Graphics g, float scale, int offsetX, int offsetY)
         {
-            PointF tl = ScreenToOriginal(new DPoint(0, 0));
+            PointF tl = ScreenToOriginal(new DPoint(0, 0));     // 좌상단 화면 좌표 -> 원본 이미지 좌표
             PointF br = ScreenToOriginal(
-                new DPoint(pictureBoxImage.Width, pictureBoxImage.Height));
+                new DPoint(pictureBoxImage.Width, pictureBoxImage.Height));  // 우하단
 
             float rx = tl.X * scale + offsetX;
-            float ry = tl.Y * scale + offsetY;
+            float ry = tl.Y * scale + offsetY;  // 사각형 시작 좌표
 
             float rw = (br.X - tl.X) * scale;
             float rh = (br.Y - tl.Y) * scale;
@@ -1009,6 +1028,8 @@ namespace ImageCropTool
             using (Pen p = new Pen(Color.Red, 2))
                 g.DrawRectangle(p, rx, ry, rw, rh);
         }
+
+
 
         /* =========================================================
          *  크롭박스 계산 / 기준점
@@ -1196,6 +1217,7 @@ namespace ImageCropTool
                 y / displayBaseScale
             );
         }
+
         private PointF OriginalToScreen(PointF originalPt)
         {
             if (displayBitmap == null)
@@ -1207,6 +1229,13 @@ namespace ImageCropTool
             return new PointF(x, y);
         }
 
+        private PointF OriginalToMiniMap(PointF original, float scale, int offsetX, int offsetY)
+        {
+            return new PointF(
+                original.X * scale + offsetX,
+                original.Y * scale + offsetY
+                );
+        }
 
         private bool IsHitOriginal(DPoint mouseScreenPt, PointF targetOriginalPt)
         {
