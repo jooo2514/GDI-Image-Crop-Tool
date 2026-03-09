@@ -18,6 +18,8 @@ namespace ImageCropTool
 {
     public partial class MainForm : Form
     {
+        private ImageTileRenderer renderer;
+
         private List<Mat> pyramidLevels = new List<Mat>();
         private List<Bitmap> pyramidBitmaps = new List<Bitmap>();   // 레벨별 Bitmap 캐시 (Format32bppPArgb)
         private List<IntPtr> pyramidHBitmaps = new List<IntPtr>(); // GDI StretchBlt용 HBITMAP 캐시
@@ -39,12 +41,8 @@ namespace ImageCropTool
         private CropBoxInfo hoveredBox = null;                             // hover된 크롭박스 (모든 기준선 통합)
 
         /* ======== Image ========== */
-        private Bitmap displayBitmap = null;
         private Mat originalMat;
         private string imageColorInfoText = string.Empty;
-
-        private Bitmap highZoomCache = null;
-        private Rectangle lastHighZoomSrcRect;
 
         /* ======== Image ========== */
         private Bitmap miniMapBitmap;
@@ -86,7 +84,7 @@ namespace ImageCropTool
         private const float ZoomStep = 1.1f;            // 휠 한칸에 10%씩 변화
         private const float MinZoom = 0.2f;
         private const float MaxZoom = 100.0f;
-        private Bitmap zoomOutCacheBitmap = null;
+
 
 
         private bool isPanning = false;
@@ -184,15 +182,6 @@ namespace ImageCropTool
             originalMat?.Dispose();
             originalMat = null;
 
-            displayBitmap?.Dispose();
-            displayBitmap = null;
-
-            highZoomCache?.Dispose();
-            highZoomCache = null;
-
-            zoomOutCacheBitmap?.Dispose();
-            zoomOutCacheBitmap = null;
-
             DisposePyramidCaches();
 
             pictureBoxImage.Image?.Dispose();
@@ -209,8 +198,12 @@ namespace ImageCropTool
         private void DataReset()
         {
             isImageLoading = true;
+
+            renderer = null;
+
             LineReset();
             DisposeResources();
+
             isImageLoading = false;
         }
 
@@ -237,24 +230,28 @@ namespace ImageCropTool
 
             // Crop size는 기본값으로
             numCropSize.Value = DefaultCropSize;
-            zoomOutCacheBitmap?.Dispose();
 
             pictureBoxMiniMap.Invalidate();
             pictureBoxImage.Invalidate();
         }
 
-        private void ResetView()    // 중앙정렬
+        private void ResetView()
         {
-            if (displayBitmap == null)
+            if (originalMat == null)
                 return;
 
-            viewScale = 1.0f;
+            float scaleX = (float)pictureBoxImage.Width / originalMat.Width;
+            float scaleY = (float)pictureBoxImage.Height / originalMat.Height;
+
+            viewScale = Math.Min(scaleX, scaleY);
 
             viewOffset = new PointF(
-                (pictureBoxImage.Width - displayBitmap.Width) / 2f,
-                (pictureBoxImage.Height - displayBitmap.Height) / 2f
+                (pictureBoxImage.Width - originalMat.Width * viewScale) / 2f,
+                (pictureBoxImage.Height - originalMat.Height * viewScale) / 2f
             );
+
             pictureBoxMiniMap.Invalidate();
+            pictureBoxImage.Invalidate();
         }
 
         private void NumCropSize_ValueChanged(object sender, EventArgs e)
@@ -300,6 +297,8 @@ namespace ImageCropTool
             if (dlg.ShowDialog() != DialogResult.OK)
                 return;
 
+            pictureBoxImage.Image = null;
+
             isImageLoading = true;
             loadingTimer.Start();
 
@@ -327,12 +326,14 @@ namespace ImageCropTool
                         imageColorInfoText = "Color (CV_8UC3)";
                     else
                         imageColorInfoText = $"Channels: {originalMat.Channels()}";
-
                 });
-                CreateDisplayBitmap();
+                //CreateDisplayBitmap();
                 LineReset();
                 BuildPyramid();
                 CreateMiniMap();
+                ResetView();
+
+                renderer = new ImageTileRenderer(pyramidLevels);
             }
             catch (Exception ex)
             {
@@ -351,38 +352,6 @@ namespace ImageCropTool
                 pictureBoxMiniMap.Invalidate();
                 pictureBoxImage.Invalidate();
             }
-        }
-
-        private void CreateDisplayBitmap()   // 렌더링용 기준 비트맵 만들기
-        {
-            if (originalMat == null)
-                return;
-
-            // 원본 비율 계산
-            float scaleX = (float)pictureBoxImage.Width / originalMat.Width;
-            float scaleY = (float)pictureBoxImage.Height / originalMat.Height;
-
-            displayBaseScale = Math.Min(scaleX, scaleY);   // 작은값 선택 비율유지
-
-            int w = (int)(originalMat.Width * displayBaseScale);  // 화면에 그릴 크기 계산
-            int h = (int)(originalMat.Height * displayBaseScale);
-
-            using (Mat resized = new Mat())
-            {
-                Cv2.Resize(originalMat, resized,
-                    new OpenCvSharp.Size(w, h),
-                    0, 0,
-                    InterpolationFlags.Area);
-
-                if (displayBitmap != null)
-                {
-                    displayBitmap.Dispose(); // 기존 비트맵 해제
-                }
-
-                displayBitmap?.Dispose();
-                displayBitmap = BitmapConverter.ToBitmap(resized);   // 비트맵으로 변환
-            }
-            ResetView();  // 중앙정렬
         }
 
         private void CreateMiniMap()
@@ -475,71 +444,27 @@ namespace ImageCropTool
             }
         }
 
-        private Mat GetBestLevel(out float levelScale)  // 상황에 맞는 층 고르기
+        private Mat GetBestLevel(out float levelScale)
         {
-            float totalScale = viewScale * displayBaseScale;   // 실제 화면 배율 계산
+            levelScale = viewScale * displayBaseScale;
 
-            // 초기값
+            if (pyramidLevels == null || pyramidLevels.Count == 0)
+                return null;
+
             int level = 0;
-            float scale = totalScale;
 
-            // 현재 배율이 절반(0.5)보다 작다면 한 단계 더 작은 이미지(피라미드 다음 층)를 선택
+            float scale = levelScale;
+
             while (scale < 0.5f && level < pyramidLevels.Count - 1)
             {
-                scale *= 2;  // 이미지가 반토막 났으니 그릴 때 스케일은 2배로 보정
+                scale *= 2f;
                 level++;
             }
 
-            levelScale = scale;         // 실제로 화면에 그릴 크기
-            currentPyramidLevel = level; // 현재 몇 번째 층을 쓰는지 저장
+            currentPyramidLevel = level;
+            levelScale = scale;
 
             return pyramidLevels[level];
-        }
-        private void UpdateHighZoomCache()
-        {
-            // 원본 비트맵이 없거나 컨트롤 크기가 정상이 아닐 때 즉시 리턴
-            if (originalMat == null || pictureBoxImage.Width <= 0 || pictureBoxImage.Height <= 0)
-                return;
-
-            if (viewScale <= 2.0f)   // 확대 2배 이상일때만
-                return;
-
-            try
-            {
-                // 화면에 실제로 보이는 원본이미지 영역 계산
-                PointF topLeft = ScreenToOriginal(new DPoint(0, 0));
-                PointF bottomRight = ScreenToOriginal(
-                    new DPoint(pictureBoxImage.Width, pictureBoxImage.Height)
-                );
-
-                int x = (int)Math.Max(0, Math.Min(originalMat.Width - 1, Math.Floor(topLeft.X)));
-                int y = (int)Math.Max(0, Math.Min(originalMat.Height - 1, Math.Floor(topLeft.Y)));
-
-                // 폭과 높이가 0보다 큰지 확인
-                int w = (int)Math.Min(originalMat.Width - x, Math.Ceiling(bottomRight.X - topLeft.X));
-                int h = (int)Math.Min(originalMat.Height - y, Math.Ceiling(bottomRight.Y - topLeft.Y));
-
-                if (w <= 0 || h <= 0) return;
-
-                Rectangle srcRect = new Rectangle(x, y, w, h);
-
-                // 이전 캐시 해제
-                highZoomCache?.Dispose();
-
-                // roi 생성
-                var roi = new OpenCvSharp.Rect(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height);
-                using (Mat cropped = new Mat(originalMat, roi))    // 원본 Mat 참조
-                {
-                    highZoomCache?.Dispose();
-                    highZoomCache = BitmapConverter.ToBitmap(cropped);
-                }
-                lastHighZoomSrcRect = srcRect;  // 같은 영역이면 재사용
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("HighZoomCache 생성 실패: " + ex.Message);
-                highZoomCache = null;
-            }
         }
 
         /* =========================================================
@@ -547,7 +472,7 @@ namespace ImageCropTool
          * ========================================================= */
         private void PictureBoxImage_MouseDown(object sender, MouseEventArgs e)
         {
-            if (displayBitmap == null || originalMat == null)
+            if (originalMat == null)
                 return;
 
             PointF originalPt = ScreenToOriginal(e.Location);
@@ -658,12 +583,6 @@ namespace ImageCropTool
          * ========================================================= */
         private void PictureBoxImage_MouseMove(object sender, MouseEventArgs e)
         {
-            if (isPanning || draggingLine != null)
-            {
-                highZoomCache?.Dispose();
-                highZoomCache = null;
-            }
-
             // 1️ 패닝
             if (isPanning)
             {
@@ -688,6 +607,7 @@ namespace ImageCropTool
                     draggingLine.EndPt = originalPt;
 
                 CalculateCropBoxes(draggingLine);
+                pictureBoxMiniMap.Invalidate();
                 pictureBoxImage.Invalidate();
                 return;
             }
@@ -695,7 +615,7 @@ namespace ImageCropTool
             // 3️ 이미지 영역 밖이면 중단
             if (!IsInsideImageScreen(e.Location))
             {
-                isBusy = false;
+                
                 return;
             }
 
@@ -707,6 +627,7 @@ namespace ImageCropTool
 
             UpdateHoverCropBox(mouseOriginalPt);
 
+            pictureBoxMiniMap.Invalidate();
             pictureBoxImage.Invalidate();
         }
 
@@ -717,23 +638,24 @@ namespace ImageCropTool
             pictureBoxImage.Cursor = Cursors.Default;
             draggingLine = null;
             dragTarget = DragTarget.None;
-            UpdateHighZoomCache();
-
         }
 
         private void PictureBoxImage_MouseWheel(object sender, MouseEventArgs e)
         {
             float oldScale = viewScale;
+            float ratio = 1.1f;
 
-            if (e.Delta > 0)
-                viewScale *= 1.1f;
-            else
-                viewScale /= 1.1f;
+            if (e.Delta > 0) viewScale *= ratio;       // 줌인
+            else viewScale /= ratio;                  // 줌아웃 (0.909배)
 
-            viewScale = Math.Max(MinZoom, Math.Min(MaxZoom, viewScale));
+            // 하한선 설정 (이미지가 점이 되어 사라지는 것 방지)
+            if (viewScale < 0.001f) viewScale = 0.001f;
 
-            viewOffset.X = e.X - (e.X - viewOffset.X) * (viewScale / oldScale);
-            viewOffset.Y = e.Y - (e.Y - viewOffset.Y) * (viewScale / oldScale);
+            // 마우스 커서 지점을 고정하고 확대/축소 (중요!)
+            // 이 계산이 없으면 줌아웃 시 이미지가 엉뚱한 방향으로 날아갑니다.
+            PointF mousePos = e.Location;
+            viewOffset.X = mousePos.X - (mousePos.X - viewOffset.X) * (viewScale / oldScale);
+            viewOffset.Y = mousePos.Y - (mousePos.Y - viewOffset.Y) * (viewScale / oldScale);
 
             pictureBoxMiniMap.Invalidate();
             pictureBoxImage.Invalidate();
@@ -743,7 +665,7 @@ namespace ImageCropTool
          *  Paint
          * ========================================================= */
 
-        bool isBusy = false;
+
         private void PictureBoxImage_Paint(object sender, PaintEventArgs e)
         {
             Graphics g = e.Graphics;
@@ -756,79 +678,34 @@ namespace ImageCropTool
                 DrawLoadingSpinner(g);
                 return;
             }
+            
+            if (renderer == null || pyramidLevels.Count == 0)
+                return;
 
-            if (isBusy) return;
-            isBusy = true;
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            g.SmoothingMode = SmoothingMode.None;
 
-            try
-            {
-                if (originalMat == null || pyramidLevels.Count == 0)
-                {
-                    isBusy = false;
-                    return;
-                }
+            float levelScale;
+            GetBestLevel(out levelScale);
 
-                float levelScale;
-                GetBestLevel(out levelScale);   // currentPyramidLevel 설정
-                if (currentPyramidLevel >= pyramidBitmaps.Count || currentPyramidLevel >= pyramidHBitmaps.Count)
-                    return;
+            renderer.ViewScale = viewScale * levelScale;
+            renderer.BaseScale = 1.0f;
+            renderer.ViewOffset = viewOffset;
 
-                Bitmap cachedBmp = pyramidBitmaps[currentPyramidLevel];     // GDI+ fallback용
-                IntPtr hBmp = pyramidHBitmaps[currentPyramidLevel];         // GDI StretchBlt용
-                float drawWidth = cachedBmp.Width * levelScale;             // 실제 그릴 크기 계산 
-                float drawHeight = cachedBmp.Height * levelScale;
-                int srcW = cachedBmp.Width;
-                int srcH = cachedBmp.Height;
+            renderer.Draw(
+                g,
+                pictureBoxImage.Size,
+                currentPyramidLevel,
+                OriginalToScreen,
+                ScreenToOriginal
+            );
+            DrawImageTypeOverlay(g);
+            DrawMousePositionOverlay(g);
+            DrawPointsAndLine(g);
+            DrawGuideBoxes(g);
+            DrawMemoryOverlay(g);
 
-                bool drawn = false;
-                if (hBmp != IntPtr.Zero)
-                {
-                    try
-                    {
-                        IntPtr hdc = g.GetHdc();        // Graphics → Win32 HDC 변환
-                        try
-                        {
-                            SetStretchBltMode(hdc, STRETCH_HALFTONE);    // StretchBlt의 보간 방식 설정
-                            SetBrushOrgEx(hdc, 0, 0, IntPtr.Zero);
-
-                            IntPtr memDC = CreateCompatibleDC(hdc);     // 메모리 DC 생성
-                            IntPtr old = SelectObject(memDC, hBmp);     // HBITMAP을 DC에 연결
-                            bool ok = StretchBlt(hdc,
-                                (int)viewOffset.X, (int)viewOffset.Y, (int)drawWidth, (int)drawHeight,
-                                memDC, 0, 0, srcW, srcH, SRCCOPY);
-                            SelectObject(memDC, old);
-                            DeleteDC(memDC);            // 리소스 정리
-                            drawn = ok;
-                        }
-                        finally
-                        {
-                            g.ReleaseHdc(hdc);   // GDI+로 
-                        }
-                    }
-                    catch { /* GDI 실패 시 폴백 */ }
-                }
-
-                if (!drawn)   // GDI 실패시 GDI+ 사용
-                {
-                    g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
-                    g.SmoothingMode = SmoothingMode.None;
-                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-
-                    g.DrawImage(cachedBmp,
-                        viewOffset.X, viewOffset.Y,
-                        drawWidth, drawHeight);
-                }
-
-                DrawPointsAndLine(g);
-                DrawGuideBoxes(g);
-                DrawMousePositionOverlay(g);
-                DrawImageTypeOverlay(g);
-                DrawMemoryOverlay(g);
-            }
-            finally
-            {
-                isBusy = false;
-            }
         }
 
         private void PictureBoxMiniMap_Paint(object sender, PaintEventArgs e)
@@ -975,8 +852,6 @@ namespace ImageCropTool
             {
                 foreach (var box in line.CropBoxes)
                 {
-                  
-
                     using (Pen pen = new Pen(Color.Yellow, 2))
                     {
                         Rectangle r = box.EffectiveRect;
@@ -995,6 +870,7 @@ namespace ImageCropTool
                 }
             }
         }
+
         private void DrawMemoryOverlay(Graphics g)
         {
             string text = GetMemoryInfo();
@@ -1206,25 +1082,16 @@ namespace ImageCropTool
          * ========================================================= */
         private PointF ScreenToOriginal(DPoint screenPt)
         {
-            if (displayBitmap == null || displayBaseScale == 0)
-                return PointF.Empty;
-
             float x = (screenPt.X - viewOffset.X) / viewScale;
             float y = (screenPt.Y - viewOffset.Y) / viewScale;
 
-            return new PointF(
-                x / displayBaseScale,
-                y / displayBaseScale
-            );
+            return new PointF(x, y);
         }
 
         private PointF OriginalToScreen(PointF originalPt)
         {
-            if (displayBitmap == null)
-                return PointF.Empty;
-
-            float x = originalPt.X * displayBaseScale * viewScale + viewOffset.X;
-            float y = originalPt.Y * displayBaseScale * viewScale + viewOffset.Y;
+            float x = originalPt.X * viewScale + viewOffset.X;
+            float y = originalPt.Y * viewScale + viewOffset.Y;
 
             return new PointF(x, y);
         }
@@ -1247,17 +1114,16 @@ namespace ImageCropTool
 
         private bool IsInsideImageScreen(DPoint screenPt)
         {
-            if (displayBitmap == null)
+            if (originalMat == null)
                 return false;
 
             RectangleF rect = new RectangleF(
                 viewOffset.X,
                 viewOffset.Y,
-                displayBitmap.Width * viewScale,
-                displayBitmap.Height * viewScale
-            );
+                originalMat.Width * viewScale,
+                originalMat.Height * viewScale
+            ); return rect.Contains(screenPt);
 
-            return rect.Contains(screenPt);
         }
 
 
