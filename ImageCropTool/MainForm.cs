@@ -21,7 +21,7 @@ namespace ImageCropTool
         private ImageTileRenderer renderer;
 
         private List<Mat> pyramidLevels = new List<Mat>();
-        private List<Bitmap> pyramidBitmaps = new List<Bitmap>();   // 레벨별 Bitmap 캐시 (Format32bppPArgb)
+        //private List<Bitmap> pyramidBitmaps = new List<Bitmap>();   // 레벨별 Bitmap 캐시 (Format32bppPArgb)
         private List<IntPtr> pyramidHBitmaps = new List<IntPtr>(); // GDI StretchBlt용 HBITMAP 캐시
         private int currentPyramidLevel = 0;
 
@@ -71,6 +71,7 @@ namespace ImageCropTool
         /* ========= Mouse Position Display =========== */
         private PointF mouseOriginalPt;                  // 표시할 이미지 좌표
         private DPoint mouseScreenPt;                    // 텍스트를 그릴 화면 위치
+        private DPoint lastMousePt;
 
         /* ========= Crop Anchor ========== */
         private CropAnchor cropAnchor = CropAnchor.Center;
@@ -85,31 +86,7 @@ namespace ImageCropTool
         private const float MinZoom = 0.2f;
         private const float MaxZoom = 100.0f;
 
-
-
         private bool isPanning = false;
-        private DPoint lastMousePt;
-
-        /* ========= GDI 렌더링 (StretchBlt) ========== */
-        private const uint SRCCOPY = 0x00CC0020;   // 비트맵 복사방식옵션 : 원본 그대로 복사
-
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr CreateCompatibleDC(IntPtr hdc);   // 메모리용 DC 생성
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);   // DC와 비트맵 연결
-        [DllImport("gdi32.dll")]
-        private static extern bool DeleteDC(IntPtr hdc);   // DC 메모리 해제
-        [DllImport("gdi32.dll")]
-        private static extern bool DeleteObject(IntPtr hObject);   // HBITMAP 제거
-        [DllImport("gdi32.dll")]
-        private static extern bool StretchBlt(IntPtr hdcDest, int xDest, int yDest, int wDest, int hDest,
-            IntPtr hdcSrc, int xSrc, int ySrc, int wSrc, int hSrc, uint rop);   // 원본이미지 크기 수정 후 화면 그림
-        [DllImport("gdi32.dll")]
-        private static extern int SetStretchBltMode(IntPtr hdc, int mode);    // 이미지 확대/축소 품질 설정
-        [DllImport("gdi32.dll")]
-        private static extern bool SetBrushOrgEx(IntPtr hdc, int x, int y, IntPtr pt);  // HALFTONE 쓸 때 반드시 같이 써야 하는 설정
-
-        private const int STRETCH_HALFTONE = 4;   // 최고 품질 (부드럽게 확대됨)
 
 
         /* ========= 생성자 =========== */
@@ -182,6 +159,9 @@ namespace ImageCropTool
             originalMat?.Dispose();
             originalMat = null;
 
+            renderer?.Dispose();
+            renderer = null;
+
             DisposePyramidCaches();
 
             pictureBoxImage.Image?.Dispose();
@@ -198,12 +178,9 @@ namespace ImageCropTool
         private void DataReset()
         {
             isImageLoading = true;
-
             renderer = null;
-
             LineReset();
             DisposeResources();
-
             isImageLoading = false;
         }
 
@@ -327,7 +304,7 @@ namespace ImageCropTool
                     else
                         imageColorInfoText = $"Channels: {originalMat.Channels()}";
                 });
-                //CreateDisplayBitmap();
+
                 LineReset();
                 BuildPyramid();
                 CreateMiniMap();
@@ -394,27 +371,6 @@ namespace ImageCropTool
             foreach (var mat in pyramidLevels) mat?.Dispose();
             pyramidLevels.Clear();
 
-            // Bitmap 정리
-            foreach (var bmp in pyramidBitmaps) bmp?.Dispose();
-            pyramidBitmaps.Clear();
-
-            // HBITMAP 정리
-            foreach (var h in pyramidHBitmaps)
-            {
-                if (h != IntPtr.Zero) DeleteObject(h);
-            }
-            pyramidHBitmaps.Clear();
-        }
-
-        private static Bitmap ToBitmap32bppPArgb(Mat mat)   // 빠르게 그릴 수 있는 bitmap 생성
-        {
-            using (Bitmap temp = BitmapConverter.ToBitmap(mat))  // Mat → Bitmap
-            {
-                var bmp = new Bitmap(temp.Width, temp.Height, PixelFormat.Format32bppPArgb);   // 도화지 생성
-                using (Graphics gr = Graphics.FromImage(bmp))    // 그릴 준비
-                    gr.DrawImage(temp, 0, 0);   // temp 이미지 그리기
-                return bmp;
-            }
         }
 
         private void BuildPyramid()    // 원본 이미지를 여러 해상도로 미리 만들기
@@ -434,14 +390,6 @@ namespace ImageCropTool
                 current = down;             // 다음 층을 위해 현재 이미지 갱신
             }
 
-            // 레벨별 Bitmap 캐시 (Format32bppPArgb) 및 HBITMAP 캐시 생성
-            for (int i = 0; i < pyramidLevels.Count; i++)
-            {
-                Bitmap bmp = ToBitmap32bppPArgb(pyramidLevels[i]);   // Mat → Bitmap 변환
-                pyramidBitmaps.Add(bmp);
-                IntPtr hBmp = bmp.GetHbitmap(); // Bitmap → Win32용 HBITMAP으로 변환
-                pyramidHBitmaps.Add(hBmp);
-            }
         }
 
         private Mat GetBestLevel(out float levelScale)
@@ -664,8 +612,6 @@ namespace ImageCropTool
         /* =========================================================
          *  Paint
          * ========================================================= */
-
-
         private void PictureBoxImage_Paint(object sender, PaintEventArgs e)
         {
             Graphics g = e.Graphics;

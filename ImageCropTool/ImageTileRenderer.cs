@@ -102,5 +102,20 @@ namespace ImageCropTool
                 }
             }
         }
+        public void Dispose()
+        {
+            if (tileCache == null) return;
+
+            foreach (var tile in tileCache.Values)
+            {
+                // tile 객체 안에 있는 'Bitmap' 변수를 직접 찾아 Dispose 합니다.
+                if (tile != null && tile.Bitmap != null)
+                {
+                    tile.Bitmap.Dispose();
+                }
+            }
+            tileCache.Clear();
+        }
+
     }
 }
