@@ -178,7 +178,6 @@ namespace ImageCropTool
         private void DataReset()
         {
             isImageLoading = true;
-            renderer = null;
             LineReset();
             DisposeResources();
             isImageLoading = false;
@@ -357,8 +356,10 @@ namespace ImageCropTool
                     InterpolationFlags.Area
                 );
 
-                miniMapBitmap?.Dispose();
+                // miniMapBitmap 자원을 PictureBox와 동기화
+                pictureBoxMiniMap.Image?.Dispose();
                 miniMapBitmap = BitmapConverter.ToBitmap(resized);
+                pictureBoxMiniMap.Image = miniMapBitmap;
             }
         }
 
@@ -367,19 +368,22 @@ namespace ImageCropTool
          * ========================================================= */
         private void DisposePyramidCaches()
         {
-            // Mat 먼저 정리
-            foreach (var mat in pyramidLevels) mat?.Dispose();
-            pyramidLevels.Clear();
+            if (pyramidLevels == null) return;
 
+            // 0번은 originalMat이므로 1번부터 Dispose
+            for (int i = 1; i < pyramidLevels.Count; i++)
+            {
+                pyramidLevels[i]?.Dispose();
+            }
+            pyramidLevels.Clear();
         }
 
         private void BuildPyramid()    // 원본 이미지를 여러 해상도로 미리 만들기
         {
             DisposePyramidCaches();
-            pyramidLevels.Clear();
-
-            Mat current = originalMat.Clone();   // 원본 복사
-            pyramidLevels.Add(current);          // 피라미드 0단계 : 원본
+   
+            pyramidLevels.Add(originalMat);          // 피라미드 0단계 : 원본
+            Mat current = originalMat;
 
             // 축소
             while (current.Width > 512 && current.Height > 512)
