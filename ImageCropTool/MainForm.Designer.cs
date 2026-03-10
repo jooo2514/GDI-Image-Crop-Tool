@@ -35,25 +35,25 @@ namespace ImageCropTool
             this.pictureBoxImage = new System.Windows.Forms.PictureBox();
             this.splitContainerMain = new System.Windows.Forms.SplitContainer();
             this.panelRight = new System.Windows.Forms.Panel();
+            this.label5 = new System.Windows.Forms.Label();
             this.pictureBoxMiniMap = new System.Windows.Forms.PictureBox();
-            this.label4 = new System.Windows.Forms.Label();
-            this.pictureBoxPreview = new System.Windows.Forms.PictureBox();
-            this.label1 = new System.Windows.Forms.Label();
-            this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
-            this.listViewMain = new System.Windows.Forms.ListView();
-            this.btnLoadImage = new System.Windows.Forms.Button();
-            this.btnCropSave = new System.Windows.Forms.Button();
-            this.btnReset = new System.Windows.Forms.Button();
             this.groupInfo = new System.Windows.Forms.GroupBox();
+            this.lblLineIndex = new System.Windows.Forms.Label();
+            this.lblCropSize = new System.Windows.Forms.Label();
+            this.lblCropCount = new System.Windows.Forms.Label();
+            this.lblLineLength = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
             this.groupCrop = new System.Windows.Forms.GroupBox();
             this.numCropSize = new System.Windows.Forms.NumericUpDown();
             this.label2 = new System.Windows.Forms.Label();
-            this.lblLineLength = new System.Windows.Forms.Label();
-            this.lblCropCount = new System.Windows.Forms.Label();
-            this.lblCropSize = new System.Windows.Forms.Label();
-            this.lblLineIndex = new System.Windows.Forms.Label();
-            this.label5 = new System.Windows.Forms.Label();
+            this.btnReset = new System.Windows.Forms.Button();
+            this.btnCropSave = new System.Windows.Forms.Button();
+            this.btnLoadImage = new System.Windows.Forms.Button();
+            this.listViewMain = new System.Windows.Forms.ListView();
+            this.pictureBoxPreview = new System.Windows.Forms.PictureBox();
+            this.label4 = new System.Windows.Forms.Label();
+            this.label1 = new System.Windows.Forms.Label();
+            this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxImage)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerMain)).BeginInit();
             this.splitContainerMain.Panel1.SuspendLayout();
@@ -61,10 +61,10 @@ namespace ImageCropTool
             this.splitContainerMain.SuspendLayout();
             this.panelRight.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxMiniMap)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxPreview)).BeginInit();
             this.groupInfo.SuspendLayout();
             this.groupCrop.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numCropSize)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxPreview)).BeginInit();
             this.SuspendLayout();
             // 
             // pictureBoxImage
@@ -73,7 +73,7 @@ namespace ImageCropTool
             this.pictureBoxImage.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pictureBoxImage.Location = new System.Drawing.Point(0, 0);
             this.pictureBoxImage.Name = "pictureBoxImage";
-            this.pictureBoxImage.Size = new System.Drawing.Size(956, 979);
+            this.pictureBoxImage.Size = new System.Drawing.Size(709, 843);
             this.pictureBoxImage.TabIndex = 0;
             this.pictureBoxImage.TabStop = false;
             // 
@@ -92,8 +92,8 @@ namespace ImageCropTool
             // 
             this.splitContainerMain.Panel2.AccessibleName = "";
             this.splitContainerMain.Panel2.Controls.Add(this.panelRight);
-            this.splitContainerMain.Size = new System.Drawing.Size(1291, 979);
-            this.splitContainerMain.SplitterDistance = 956;
+            this.splitContainerMain.Size = new System.Drawing.Size(965, 843);
+            this.splitContainerMain.SplitterDistance = 709;
             this.splitContainerMain.SplitterWidth = 6;
             this.splitContainerMain.TabIndex = 2;
             // 
@@ -114,93 +114,26 @@ namespace ImageCropTool
             this.panelRight.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelRight.Location = new System.Drawing.Point(0, 0);
             this.panelRight.Name = "panelRight";
-            this.panelRight.Size = new System.Drawing.Size(329, 979);
+            this.panelRight.Size = new System.Drawing.Size(250, 843);
             this.panelRight.TabIndex = 0;
+            // 
+            // label5
+            // 
+            this.label5.AutoSize = true;
+            this.label5.Location = new System.Drawing.Point(95, 541);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(61, 15);
+            this.label5.TabIndex = 19;
+            this.label5.Text = "MiniMap";
             // 
             // pictureBoxMiniMap
             // 
             this.pictureBoxMiniMap.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.pictureBoxMiniMap.Location = new System.Drawing.Point(13, 660);
+            this.pictureBoxMiniMap.Location = new System.Drawing.Point(27, 559);
             this.pictureBoxMiniMap.Name = "pictureBoxMiniMap";
-            this.pictureBoxMiniMap.Size = new System.Drawing.Size(253, 240);
+            this.pictureBoxMiniMap.Size = new System.Drawing.Size(210, 204);
             this.pictureBoxMiniMap.TabIndex = 10;
             this.pictureBoxMiniMap.TabStop = false;
-            // 
-            // label4
-            // 
-            this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(10, 368);
-            this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(58, 15);
-            this.label4.TabIndex = 9;
-            this.label4.Text = "Preview";
-            // 
-            // pictureBoxPreview
-            // 
-            this.pictureBoxPreview.BackColor = System.Drawing.SystemColors.ActiveBorder;
-            this.pictureBoxPreview.Location = new System.Drawing.Point(13, 386);
-            this.pictureBoxPreview.Name = "pictureBoxPreview";
-            this.pictureBoxPreview.Size = new System.Drawing.Size(253, 240);
-            this.pictureBoxPreview.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
-            this.pictureBoxPreview.TabIndex = 8;
-            this.pictureBoxPreview.TabStop = false;
-            // 
-            // label1
-            // 
-            this.label1.AutoSize = true;
-            this.label1.Dock = System.Windows.Forms.DockStyle.Top;
-            this.label1.Location = new System.Drawing.Point(0, 0);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(417, 15);
-            this.label1.TabIndex = 4;
-            this.label1.Text = "                                                                                 " +
-    " ";
-            // 
-            // contextMenuStrip1
-            // 
-            this.contextMenuStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
-            this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(61, 4);
-            // 
-            // listViewMain
-            // 
-            this.listViewMain.HideSelection = false;
-            this.listViewMain.Location = new System.Drawing.Point(13, 160);
-            this.listViewMain.Name = "listViewMain";
-            this.listViewMain.Size = new System.Drawing.Size(166, 190);
-            this.listViewMain.TabIndex = 12;
-            this.listViewMain.UseCompatibleStateImageBehavior = false;
-            this.listViewMain.View = System.Windows.Forms.View.List;
-            // 
-            // btnLoadImage
-            // 
-            this.btnLoadImage.Location = new System.Drawing.Point(12, 918);
-            this.btnLoadImage.Name = "btnLoadImage";
-            this.btnLoadImage.Size = new System.Drawing.Size(99, 49);
-            this.btnLoadImage.TabIndex = 13;
-            this.btnLoadImage.Text = "불러오기";
-            this.btnLoadImage.UseVisualStyleBackColor = true;
-            this.btnLoadImage.Click += new System.EventHandler(this.BtnLoadImage_Click);
-            // 
-            // btnCropSave
-            // 
-            this.btnCropSave.Location = new System.Drawing.Point(117, 918);
-            this.btnCropSave.Name = "btnCropSave";
-            this.btnCropSave.Size = new System.Drawing.Size(95, 49);
-            this.btnCropSave.TabIndex = 14;
-            this.btnCropSave.Text = "저장하기";
-            this.btnCropSave.UseVisualStyleBackColor = true;
-            this.btnCropSave.Click += new System.EventHandler(this.BtnCropSave_Click);
-            // 
-            // btnReset
-            // 
-            this.btnReset.Location = new System.Drawing.Point(218, 918);
-            this.btnReset.Name = "btnReset";
-            this.btnReset.Size = new System.Drawing.Size(99, 49);
-            this.btnReset.TabIndex = 15;
-            this.btnReset.Text = "초기화";
-            this.btnReset.UseVisualStyleBackColor = true;
-            this.btnReset.Click += new System.EventHandler(this.BtnReset_Click);
             // 
             // groupInfo
             // 
@@ -209,18 +142,54 @@ namespace ImageCropTool
             this.groupInfo.Controls.Add(this.lblCropCount);
             this.groupInfo.Controls.Add(this.lblLineLength);
             this.groupInfo.Dock = System.Windows.Forms.DockStyle.Top;
-            this.groupInfo.Location = new System.Drawing.Point(0, 86);
+            this.groupInfo.Location = new System.Drawing.Point(0, 95);
             this.groupInfo.Name = "groupInfo";
-            this.groupInfo.Size = new System.Drawing.Size(329, 68);
+            this.groupInfo.Size = new System.Drawing.Size(250, 68);
             this.groupInfo.TabIndex = 18;
             this.groupInfo.TabStop = false;
             this.groupInfo.Text = "Line Info";
+            // 
+            // lblLineIndex
+            // 
+            this.lblLineIndex.AutoSize = true;
+            this.lblLineIndex.Location = new System.Drawing.Point(10, 21);
+            this.lblLineIndex.Name = "lblLineIndex";
+            this.lblLineIndex.Size = new System.Drawing.Size(61, 15);
+            this.lblLineIndex.TabIndex = 3;
+            this.lblLineIndex.Text = "Index: -";
+            // 
+            // lblCropSize
+            // 
+            this.lblCropSize.AutoSize = true;
+            this.lblCropSize.Location = new System.Drawing.Point(133, 21);
+            this.lblCropSize.Name = "lblCropSize";
+            this.lblCropSize.Size = new System.Drawing.Size(90, 15);
+            this.lblCropSize.TabIndex = 2;
+            this.lblCropSize.Text = "Crop Size: -";
+            // 
+            // lblCropCount
+            // 
+            this.lblCropCount.AutoSize = true;
+            this.lblCropCount.Location = new System.Drawing.Point(134, 41);
+            this.lblCropCount.Name = "lblCropCount";
+            this.lblCropCount.Size = new System.Drawing.Size(100, 15);
+            this.lblCropCount.TabIndex = 1;
+            this.lblCropCount.Text = "Crop Count: -";
+            // 
+            // lblLineLength
+            // 
+            this.lblLineLength.AutoSize = true;
+            this.lblLineLength.Location = new System.Drawing.Point(10, 41);
+            this.lblLineLength.Name = "lblLineLength";
+            this.lblLineLength.Size = new System.Drawing.Size(69, 15);
+            this.lblLineLength.TabIndex = 0;
+            this.lblLineLength.Text = "Length: -";
             // 
             // label3
             // 
             this.label3.AutoSize = true;
             this.label3.Dock = System.Windows.Forms.DockStyle.Top;
-            this.label3.Location = new System.Drawing.Point(0, 71);
+            this.label3.Location = new System.Drawing.Point(0, 80);
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(317, 15);
             this.label3.TabIndex = 17;
@@ -233,7 +202,7 @@ namespace ImageCropTool
             this.groupCrop.Dock = System.Windows.Forms.DockStyle.Top;
             this.groupCrop.Location = new System.Drawing.Point(0, 15);
             this.groupCrop.Name = "groupCrop";
-            this.groupCrop.Size = new System.Drawing.Size(329, 56);
+            this.groupCrop.Size = new System.Drawing.Size(250, 65);
             this.groupCrop.TabIndex = 16;
             this.groupCrop.TabStop = false;
             this.groupCrop.Text = "Crop 설정";
@@ -245,7 +214,7 @@ namespace ImageCropTool
             0,
             0,
             0});
-            this.numCropSize.Location = new System.Drawing.Point(155, 23);
+            this.numCropSize.Location = new System.Drawing.Point(136, 24);
             this.numCropSize.Maximum = new decimal(new int[] {
             2560,
             0,
@@ -274,56 +243,87 @@ namespace ImageCropTool
             this.label2.TabIndex = 0;
             this.label2.Text = "Crop Size (px)";
             // 
-            // lblLineLength
+            // btnReset
             // 
-            this.lblLineLength.AutoSize = true;
-            this.lblLineLength.Location = new System.Drawing.Point(10, 41);
-            this.lblLineLength.Name = "lblLineLength";
-            this.lblLineLength.Size = new System.Drawing.Size(101, 15);
-            this.lblLineLength.TabIndex = 0;
-            this.lblLineLength.Text = "Line Length: -";
+            this.btnReset.Location = new System.Drawing.Point(181, 778);
+            this.btnReset.Name = "btnReset";
+            this.btnReset.Size = new System.Drawing.Size(79, 49);
+            this.btnReset.TabIndex = 15;
+            this.btnReset.Text = "초기화";
+            this.btnReset.UseVisualStyleBackColor = true;
+            this.btnReset.Click += new System.EventHandler(this.BtnReset_Click);
             // 
-            // lblCropCount
+            // btnCropSave
             // 
-            this.lblCropCount.AutoSize = true;
-            this.lblCropCount.Location = new System.Drawing.Point(175, 41);
-            this.lblCropCount.Name = "lblCropCount";
-            this.lblCropCount.Size = new System.Drawing.Size(100, 15);
-            this.lblCropCount.TabIndex = 1;
-            this.lblCropCount.Text = "Crop Count: -";
+            this.btnCropSave.Location = new System.Drawing.Point(98, 778);
+            this.btnCropSave.Name = "btnCropSave";
+            this.btnCropSave.Size = new System.Drawing.Size(79, 49);
+            this.btnCropSave.TabIndex = 14;
+            this.btnCropSave.Text = "저장하기";
+            this.btnCropSave.UseVisualStyleBackColor = true;
+            this.btnCropSave.Click += new System.EventHandler(this.BtnCropSave_Click);
             // 
-            // lblCropSize
+            // btnLoadImage
             // 
-            this.lblCropSize.AutoSize = true;
-            this.lblCropSize.Location = new System.Drawing.Point(175, 21);
-            this.lblCropSize.Name = "lblCropSize";
-            this.lblCropSize.Size = new System.Drawing.Size(90, 15);
-            this.lblCropSize.TabIndex = 2;
-            this.lblCropSize.Text = "Crop Size: -";
+            this.btnLoadImage.Location = new System.Drawing.Point(12, 778);
+            this.btnLoadImage.Name = "btnLoadImage";
+            this.btnLoadImage.Size = new System.Drawing.Size(84, 49);
+            this.btnLoadImage.TabIndex = 13;
+            this.btnLoadImage.Text = "불러오기";
+            this.btnLoadImage.UseVisualStyleBackColor = true;
+            this.btnLoadImage.Click += new System.EventHandler(this.BtnLoadImage_Click);
             // 
-            // lblLineIndex
+            // listViewMain
             // 
-            this.lblLineIndex.AutoSize = true;
-            this.lblLineIndex.Location = new System.Drawing.Point(10, 21);
-            this.lblLineIndex.Name = "lblLineIndex";
-            this.lblLineIndex.Size = new System.Drawing.Size(93, 15);
-            this.lblLineIndex.TabIndex = 3;
-            this.lblLineIndex.Text = "Line Index: -";
+            this.listViewMain.HideSelection = false;
+            this.listViewMain.Location = new System.Drawing.Point(27, 190);
+            this.listViewMain.Name = "listViewMain";
+            this.listViewMain.Size = new System.Drawing.Size(210, 122);
+            this.listViewMain.TabIndex = 12;
+            this.listViewMain.UseCompatibleStateImageBehavior = false;
+            this.listViewMain.View = System.Windows.Forms.View.List;
             // 
-            // label5
+            // pictureBoxPreview
             // 
-            this.label5.AutoSize = true;
-            this.label5.Location = new System.Drawing.Point(10, 642);
-            this.label5.Name = "label5";
-            this.label5.Size = new System.Drawing.Size(61, 15);
-            this.label5.TabIndex = 19;
-            this.label5.Text = "MiniMap";
+            this.pictureBoxPreview.BackColor = System.Drawing.SystemColors.ActiveBorder;
+            this.pictureBoxPreview.Location = new System.Drawing.Point(27, 333);
+            this.pictureBoxPreview.Name = "pictureBoxPreview";
+            this.pictureBoxPreview.Size = new System.Drawing.Size(210, 204);
+            this.pictureBoxPreview.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            this.pictureBoxPreview.TabIndex = 8;
+            this.pictureBoxPreview.TabStop = false;
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Location = new System.Drawing.Point(95, 315);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(58, 15);
+            this.label4.TabIndex = 9;
+            this.label4.Text = "Preview";
+            // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Dock = System.Windows.Forms.DockStyle.Top;
+            this.label1.Location = new System.Drawing.Point(0, 0);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(417, 15);
+            this.label1.TabIndex = 4;
+            this.label1.Text = "                                                                                 " +
+    " ";
+            // 
+            // contextMenuStrip1
+            // 
+            this.contextMenuStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
+            this.contextMenuStrip1.Name = "contextMenuStrip1";
+            this.contextMenuStrip1.Size = new System.Drawing.Size(61, 4);
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1291, 979);
+            this.ClientSize = new System.Drawing.Size(965, 843);
             this.Controls.Add(this.splitContainerMain);
             this.DoubleBuffered = true;
             this.Name = "MainForm";
@@ -336,12 +336,12 @@ namespace ImageCropTool
             this.panelRight.ResumeLayout(false);
             this.panelRight.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxMiniMap)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxPreview)).EndInit();
             this.groupInfo.ResumeLayout(false);
             this.groupInfo.PerformLayout();
             this.groupCrop.ResumeLayout(false);
             this.groupCrop.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numCropSize)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxPreview)).EndInit();
             this.ResumeLayout(false);
 
         }

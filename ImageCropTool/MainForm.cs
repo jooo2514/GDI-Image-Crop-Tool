@@ -1360,8 +1360,8 @@ namespace ImageCropTool
         {
             if (line == null)
             {
-                lblLineIndex.Text = "Line Index: -";
-                lblLineLength.Text = "Line Length: -";
+                lblLineIndex.Text = "Index: -";
+                lblLineLength.Text = "Length: -";
                 lblCropCount.Text = "Crop Count: -";
                 lblCropSize.Text = "Crop Size: -";
                 return;
@@ -1375,8 +1375,8 @@ namespace ImageCropTool
             float dy = line.EndPt.Y - line.StartPt.Y;
             float length = (float)Math.Sqrt(dx * dx + dy * dy);
 
-            lblLineIndex.Text = $"Line Index: {lineIndex}";
-            lblLineLength.Text = $"Line Length: {length:F1}px";
+            lblLineIndex.Text = $"Index: {lineIndex}";
+            lblLineLength.Text = $"Length: {length:F1}px";
             lblCropCount.Text = $"Crop Count: {line.CropBoxes.Count}";
             lblCropSize.Text = $"Crop Size: {line.CropSize}";
         }
