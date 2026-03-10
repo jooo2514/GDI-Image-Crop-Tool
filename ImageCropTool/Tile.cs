@@ -12,5 +12,6 @@ namespace ImageCropTool
     {
         public Bitmap Bitmap;
         public Rectangle Rect;
+        public long LastUsed;   // 최근 사용 시간
     }
 }

@@ -4,12 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Diagnostics;
+using Newtonsoft.Json;
 
 // 충돌 방지 별칭
 using DPoint = System.Drawing.Point;
@@ -18,18 +17,14 @@ namespace ImageCropTool
 {
     public partial class MainForm : Form
     {
+        /* ======= Pyramid / Tile ========*/ 
         private ImageTileRenderer renderer;
-
         private List<Mat> pyramidLevels = new List<Mat>();
-        //private List<Bitmap> pyramidBitmaps = new List<Bitmap>();   // 레벨별 Bitmap 캐시 (Format32bppPArgb)
-        private List<IntPtr> pyramidHBitmaps = new List<IntPtr>(); // GDI StretchBlt용 HBITMAP 캐시
         private int currentPyramidLevel = 0;
 
-
         /* ========= Context Menu ========= */
-        private ContextMenuStrip lineContextMenu;
         private BaseLineInfo contextTargetLine = null;  // 우클릭 대상
-
+        private ContextMenuStrip lineContextMenu;
         private ToolStripMenuItem deleteLineItem;
         private ToolStripMenuItem resetviewItem;
         private ToolStripMenuItem lineResetItem;
@@ -40,11 +35,20 @@ namespace ImageCropTool
         private BaseLineInfo currentLine = null;                           // 현재 그리고 있는 기준선
         private CropBoxInfo hoveredBox = null;                             // hover된 크롭박스 (모든 기준선 통합)
 
+        enum ListViewMode
+        {
+            LineList,
+            CropList
+        }
+
+        private ListViewMode currentListMode = ListViewMode.LineList;
+        private BaseLineInfo currentLineInView = null;
+        private string currentImagePath = null;
+        private CropBoxInfo selectedCropBox = null;
+
         /* ======== Image ========== */
         private Mat originalMat;
         private string imageColorInfoText = string.Empty;
-
-        /* ======== Image ========== */
         private Bitmap miniMapBitmap;
         private float miniMapScale;
 
@@ -53,7 +57,7 @@ namespace ImageCropTool
         private Timer loadingTimer;
         private float spinnerAngle = 0f;
 
-        /* ========= Drag / Click State ========== */
+        /* ========= Click State ========== */
         private enum ClickState { None, OnePoint }
         private ClickState clickState = ClickState.None;
         private const int HitRadius = 8;
@@ -78,16 +82,12 @@ namespace ImageCropTool
 
         /* ========== View Transform (Zoom & Pan) ============ */
         private float viewScale = 1.0f;                 // 줌 배율
-        private float displayBaseScale = 1.0f;          // 화면에 맞추기 위한 기본 축소 비율
-
-        private PointF viewOffset = new PointF(0, 0);   // 이미지 시작 위치
-
         private const float ZoomStep = 1.1f;            // 휠 한칸에 10%씩 변화
-        private const float MinZoom = 0.2f;
-        private const float MaxZoom = 100.0f;
-
+        private PointF viewOffset = new PointF(0, 0);   // 이미지 시작 위치
         private bool isPanning = false;
 
+        private float MinZoom = 0.01f;
+        private float MaxZoom = 5.0f;
 
         /* ========= 생성자 =========== */
         public MainForm()
@@ -101,19 +101,27 @@ namespace ImageCropTool
                 pictureBoxImage.Invalidate();
             };
 
+            numCropSize.Value = DefaultCropSize;
+
             pictureBoxImage.SizeMode = PictureBoxSizeMode.Normal;
+            pictureBoxPreview.SizeMode = PictureBoxSizeMode.Zoom;
+            pictureBoxMiniMap.Paint += PictureBoxMiniMap_Paint;
             pictureBoxImage.Paint += PictureBoxImage_Paint;
             pictureBoxImage.MouseDown += PictureBoxImage_MouseDown;
             pictureBoxImage.MouseMove += PictureBoxImage_MouseMove;
             pictureBoxImage.MouseUp += PictureBoxImage_MouseUp;
             pictureBoxImage.MouseWheel += PictureBoxImage_MouseWheel;
 
-            pictureBoxPreview.SizeMode = PictureBoxSizeMode.Zoom;
-            numCropSize.Value = DefaultCropSize;
+            //this.FormClosing += (s, e) => DisposeResources();
+            this.FormClosing += MainForm_FormClosing;
 
-            pictureBoxMiniMap.Paint += PictureBoxMiniMap_Paint;
+            listViewMain.View = View.List;
+            listViewMain.FullRowSelect = true;
+            listViewMain.HideSelection = false;
 
-            this.FormClosing += (s, e) => DisposeResources();
+            listViewMain.Click += listViewMain_Click;
+            listViewMain.DoubleClick += listViewMain_DoubleClick;
+            listViewMain.SelectedIndexChanged += listViewMain_SelectedIndexChanged;
 
             // 우클릭 메뉴 객체 생성
             lineContextMenu = new ContextMenuStrip();
@@ -130,22 +138,264 @@ namespace ImageCropTool
 
             deleteLineItem.Click += (s, e) => DeleteLine(contextTargetLine);
             resetviewItem.Click += (s, e) => ResetView();
-            lineResetItem.Click += (s, e) => LineReset();
+            lineResetItem.Click += (s, e) => TeachingReset();
         }
 
 
-        private string GetMemoryInfo()
+        /* ============== 티칭정보 ================== */
+
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            Process p = Process.GetCurrentProcess();
+            if (!string.IsNullOrEmpty(currentImagePath))
+            {
+                SaveTeachingData(currentImagePath);
+            }
+        }
 
-            long workingSet = p.WorkingSet64;               // RAM 사용량
-            long privateBytes = p.PrivateMemorySize64;      // 실제 Commit
-            long managed = GC.GetTotalMemory(false);        // Managed heap
-            //long inPageFile = privateBytes - workingSet;     // 가상메모리 데이터                                           // 
+        private void LoadTeachingData(string imagePath)
+        {
+            baseLines.Clear();
 
-            return $"WS: {workingSet / 1024 / 1024} MB | " +
-                   $"Private: {privateBytes / 1024 / 1024} MB";
-                   //$"Managed: {managed / 1024 / 1024} MB";
+            string jsonPath = Path.Combine(
+                Application.StartupPath,
+                "Teaching",
+                Path.GetFileNameWithoutExtension(imagePath) + ".json"
+            );
+
+            if (!File.Exists(jsonPath))
+                return;
+
+            string json = File.ReadAllText(jsonPath);
+            TeachingData data = JsonConvert.DeserializeObject<TeachingData>(json);
+
+            if (data == null || data.Lines == null)
+                return;
+
+            // 이미지 검증
+            if (!string.Equals(data.ImagePath, imagePath, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            baseLines.Clear();
+
+            foreach (var lineData in data.Lines)
+            {
+                BaseLineInfo line = new BaseLineInfo
+                {
+                    StartPt = lineData.StartPt,
+                    EndPt = lineData.EndPt,
+                    CropSize = lineData.CropSize,
+                    Anchor = lineData.Anchor
+                };
+
+                CalculateCropBoxes(line);
+                baseLines.Add(line);
+            }
+
+            pictureBoxImage.Invalidate();
+        }
+
+        private void SaveTeachingData(string imagePath)
+        {
+            if (baseLines.Count == 0 || string.IsNullOrEmpty(imagePath))
+                return;
+
+            TeachingData data = new TeachingData
+            {
+                ImagePath = imagePath
+            };
+
+            foreach (var line in baseLines)
+            {
+                data.Lines.Add(new BaseLineData
+                {
+                    StartPt = line.StartPt,
+                    EndPt = line.EndPt,
+                    CropSize = line.CropSize,
+                    Anchor = line.Anchor
+                });
+            }
+
+            string folder = Path.Combine(Application.StartupPath, "Teaching");
+            Directory.CreateDirectory(folder);
+
+            string jsonPath = Path.Combine(
+                folder,
+                Path.GetFileNameWithoutExtension(imagePath) + ".json"
+            );
+
+            string json = JsonConvert.SerializeObject(data, Formatting.Indented);
+
+            File.WriteAllText(jsonPath, json);
+        }
+
+        private void ShowLineList()
+        {
+            listViewMain.BeginUpdate();
+            listViewMain.Items.Clear();
+
+            for (int i = 0; i < baseLines.Count; i++)
+            {
+                baseLines[i].LineIndex = i + 1;
+
+                ListViewItem item = new ListViewItem($"Line {i + 1}");
+                item.Tag = baseLines[i];
+
+                listViewMain.Items.Add(item);
+            }
+
+            currentListMode = ListViewMode.LineList;
+            currentLineInView = null;
+
+            listViewMain.EndUpdate();
+        }
+
+        private void ShowCropList(BaseLineInfo line)
+        {
+            listViewMain.Items.Clear();
+
+            // Back
+            ListViewItem back = new ListViewItem("< Back");
+            back.Tag = null;
+            listViewMain.Items.Add(back);
+
+            for (int i = 0; i < line.CropBoxes.Count; i++)
+            {
+                ListViewItem item = new ListViewItem($"Crop {i + 1}");
+                item.Tag = line.CropBoxes[i];
+                listViewMain.Items.Add(item);
+            }
+
+            currentListMode = ListViewMode.CropList;
+            currentLineInView = line;
+            selectedCropBox = null;
+
+            // Crop 리스트 진입 시
+            // 라인 전체 하이라이트 유지
+            HighlightLine(line);
+
+            pictureBoxImage.Invalidate();
+        }
+
+        private void listViewMain_Click(object sender, EventArgs e)
+        {
+            // 선택된 항목이 없으면 종료
+            if (listViewMain.SelectedItems.Count == 0)
+                return;
+
+            // 현재 모드가 Line 리스트일 때만
+            if (currentListMode != ListViewMode.LineList)
+                return;
+
+            ListViewItem item = listViewMain.SelectedItems[0];
+
+            BaseLineInfo line = item.Tag as BaseLineInfo;
+            if (line == null)
+                return;
+
+            // 현재 선택 라인 갱신
+            currentLineInView = line;
+
+            //  해당 라인의 모든 CropBox 하이라이트
+            HighlightLine(line);
+            UpdateLineInfo(line);
+
+            pictureBoxImage.Invalidate();
+        }
+
+
+        private void listViewMain_DoubleClick(object sender, EventArgs e)
+        {
+            if (listViewMain.SelectedItems.Count == 0)
+                return;
+
+            ListViewItem item = listViewMain.SelectedItems[0];
+
+            // Line → Crop 리스트로 진입
+            if (currentListMode == ListViewMode.LineList)
+            {
+                BaseLineInfo line = item.Tag as BaseLineInfo;
+                if (line == null)
+                    return;
+
+                ShowCropList(line);
+                return;
+            }
+
+            // CropList에서는 더블클릭 아무 동작 안 함
+        }
+
+
+        private void listViewMain_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (listViewMain.SelectedItems.Count == 0)
+                return;
+
+            ListViewItem item = listViewMain.SelectedItems[0];
+
+            // =========================
+            // Crop 리스트 모드
+            // =========================
+            if (currentListMode == ListViewMode.CropList)
+            {
+                // Back은 즉시 LineList로
+                if (item.Text == "< Back")
+                {
+                    ShowLineList();
+                    return;
+                }
+
+                CropBoxInfo crop = item.Tag as CropBoxInfo;
+                if (crop == null)
+                    return;
+
+                selectedCropBox = crop;
+
+                // 1. 하이라이트
+                ClearAllHighlights();
+                crop.IsHovered = true;
+
+                // 2. Preview
+                ShowCropPreview(crop);
+
+                pictureBoxImage.Invalidate();
+                return;
+            }
+
+            // =========================
+            // Line 리스트 모드
+            // =========================
+            if (currentListMode == ListViewMode.LineList)
+            {
+                BaseLineInfo line = item.Tag as BaseLineInfo;
+                if (line == null)
+                    return;
+
+                currentLineInView = line;
+                selectedCropBox = null;
+
+                HighlightLine(line);
+                pictureBoxImage.Invalidate();
+                return;
+            }
+        }
+
+
+        private void ClearAllHighlights()
+        {
+            foreach (var line in baseLines)
+                foreach (var box in line.CropBoxes)
+                    box.IsHovered = false;
+        }
+
+        private void HighlightLine(BaseLineInfo line)
+        {
+            ClearAllHighlights();
+
+            if (line == null)
+                return;
+
+            foreach (var box in line.CropBoxes)
+                box.IsHovered = true;
         }
 
 
@@ -156,13 +406,13 @@ namespace ImageCropTool
 
         private void DisposeResources()  // 이미지 리소스 전부 해제
         {
-            originalMat?.Dispose();
-            originalMat = null;
-
             renderer?.Dispose();
             renderer = null;
 
             DisposePyramidCaches();
+
+            originalMat?.Dispose();
+            originalMat = null;
 
             pictureBoxImage.Image?.Dispose();
             pictureBoxImage.Image = null;
@@ -175,36 +425,49 @@ namespace ImageCropTool
 
         }
 
+        private void TeachingReset()
+        {
+            LineReset();
+
+            // -------- teaching 파일 삭제 --------
+            if (!string.IsNullOrEmpty(currentImagePath))
+            {
+                string folder = Path.Combine(Application.StartupPath, "Teaching");
+
+                string jsonPath = Path.Combine(
+                    folder,
+                    Path.GetFileNameWithoutExtension(currentImagePath) + ".json"
+                );
+
+                if (File.Exists(jsonPath))
+                    File.Delete(jsonPath);
+            }
+        }
         private void DataReset()
         {
             isImageLoading = true;
             LineReset();
+            TeachingReset();
             DisposeResources();
             isImageLoading = false;
         }
 
         private void LineReset()
         {
-            // 기준선/점/크롭 전체 제거
+            // -------- 메모리 초기화 --------
             baseLines.Clear();
             clickState = ClickState.None;
             currentLine = null;
 
-            // 드래그/hover 상태 초기화
             draggingLine = null;
             dragTarget = DragTarget.None;
             hoveredBox = null;
 
-            // UI 초기화
             ClearPreview();
+            ShowLineList();
+            UpdateLineInfo(null);
+            listViewMain.Items.Clear();
 
-            // Line info 초기화
-            lblLineIndex.Text = "Line Index: -";
-            lblLineLength.Text = "Line Length: -";
-            lblCropSize.Text = "Crop Size: -";
-            lblCropCount.Text = "Crop Count: -";
-
-            // Crop size는 기본값으로
             numCropSize.Value = DefaultCropSize;
 
             pictureBoxMiniMap.Invalidate();
@@ -254,6 +517,7 @@ namespace ImageCropTool
                 draggingLine = null;
                 dragTarget = DragTarget.None;
             }
+            ShowLineList();
             UpdateLineInfo(null);
             pictureBoxMiniMap.Invalidate();
             pictureBoxImage.Invalidate();
@@ -272,6 +536,17 @@ namespace ImageCropTool
 
             if (dlg.ShowDialog() != DialogResult.OK)
                 return;
+
+
+            string newImagePath = dlg.FileName;
+
+            // 1️ 이전 이미지 티칭 정보 저장
+            if (!string.IsNullOrEmpty(currentImagePath))
+            {
+                SaveTeachingData(currentImagePath);
+            }
+
+            currentImagePath = newImagePath;
 
             pictureBoxImage.Image = null;
 
@@ -308,6 +583,9 @@ namespace ImageCropTool
                 BuildPyramid();
                 CreateMiniMap();
                 ResetView();
+                LoadTeachingData(currentImagePath);
+                ShowLineList();
+
 
                 renderer = new ImageTileRenderer(pyramidLevels);
             }
@@ -398,7 +676,7 @@ namespace ImageCropTool
 
         private Mat GetBestLevel(out float levelScale)
         {
-            levelScale = viewScale * displayBaseScale;
+            levelScale = viewScale;
 
             if (pyramidLevels == null || pyramidLevels.Count == 0)
                 return null;
@@ -463,8 +741,6 @@ namespace ImageCropTool
                             deleteLineItem.Enabled = false;
                             lineContextMenu.Show(pictureBoxImage, e.Location);
                         }
-
-                        isPanning = true;
                         lastMousePt = e.Location;
                         return;
                     }
@@ -511,7 +787,7 @@ namespace ImageCropTool
 
                             CalculateCropBoxes(currentLine);
                             baseLines.Add(currentLine);
-
+                            ShowLineList();
                             currentLine = null;
                             clickState = ClickState.None;
                         }
@@ -594,20 +870,13 @@ namespace ImageCropTool
 
         private void PictureBoxImage_MouseWheel(object sender, MouseEventArgs e)
         {
-            float oldScale = viewScale;
-            float ratio = 1.1f;
+            float oldScale = viewScale;   // 확대 전 스케일 저장
+            viewScale = e.Delta > 0 ? viewScale * ZoomStep : viewScale / ZoomStep;      // 휠 한칸당 10% 확대/축소
+            viewScale = Math.Max(MinZoom, Math.Min(MaxZoom, viewScale));   // 줌 한계 제한
 
-            if (e.Delta > 0) viewScale *= ratio;       // 줌인
-            else viewScale /= ratio;                  // 줌아웃 (0.909배)
-
-            // 하한선 설정 (이미지가 점이 되어 사라지는 것 방지)
-            if (viewScale < 0.001f) viewScale = 0.001f;
-
-            // 마우스 커서 지점을 고정하고 확대/축소 (중요!)
-            // 이 계산이 없으면 줌아웃 시 이미지가 엉뚱한 방향으로 날아갑니다.
-            PointF mousePos = e.Location;
-            viewOffset.X = mousePos.X - (mousePos.X - viewOffset.X) * (viewScale / oldScale);
-            viewOffset.Y = mousePos.Y - (mousePos.Y - viewOffset.Y) * (viewScale / oldScale);
+            // 마우스 위치를 기준으로 이미지 다시 배치
+            viewOffset.X = e.X - (e.X - viewOffset.X) * (viewScale / oldScale);   // e.X - (기존 거리 × 확대비율)
+            viewOffset.Y = e.Y - (e.Y - viewOffset.Y) * (viewScale / oldScale);
 
             pictureBoxMiniMap.Invalidate();
             pictureBoxImage.Invalidate();
@@ -640,7 +909,7 @@ namespace ImageCropTool
             GetBestLevel(out levelScale);
 
             renderer.ViewScale = viewScale * levelScale;
-            renderer.BaseScale = 1.0f;
+            //renderer.BaseScale = 1.0f;
             renderer.ViewOffset = viewOffset;
 
             renderer.Draw(
@@ -954,18 +1223,25 @@ namespace ImageCropTool
         /* =========================================================
          *  Preview 미리보기
          * ========================================================= */
-        private void ShowCropPreview(CropBoxInfo hoverdBox)   // 박스 미리보기
+        private void ShowCropPreview(CropBoxInfo hoverdBox)
         {
             if (hoverdBox == null || originalMat == null)
                 return;
 
             Rectangle r = hoverdBox.EffectiveRect;
 
-            var roi = new OpenCvSharp.Rect(   // ROI 생성
-                r.X, r.Y, r.Width, r.Height
-            );
+            int x = Math.Max(0, r.X);
+            int y = Math.Max(0, r.Y);
 
-            using (Mat cropped = new Mat(originalMat, roi))   // ROI로 Mat 잘라내기
+            int w = Math.Min(r.Width, originalMat.Width - x);
+            int h = Math.Min(r.Height, originalMat.Height - y);
+
+            if (w <= 0 || h <= 0)
+                return;
+
+            var roi = new OpenCvSharp.Rect(x, y, w, h);
+
+            using (Mat cropped = new Mat(originalMat, roi))
             {
                 pictureBoxPreview.Image?.Dispose();
                 pictureBoxPreview.Image = BitmapConverter.ToBitmap(cropped);
@@ -1131,5 +1407,20 @@ namespace ImageCropTool
                 );
             }
         }
+
+        private string GetMemoryInfo()
+        {
+            Process p = Process.GetCurrentProcess();
+
+            long workingSet = p.WorkingSet64;               // RAM 사용량
+            long privateBytes = p.PrivateMemorySize64;      // 실제 Commit
+            long managed = GC.GetTotalMemory(false);        // Managed heap
+            //long inPageFile = privateBytes - workingSet;     // 가상메모리 데이터                                           // 
+
+            return $"WS: {workingSet / 1024 / 1024} MB | " +
+                   $"Private: {privateBytes / 1024 / 1024} MB";
+            //$"Managed: {managed / 1024 / 1024} MB";
+        }
+
     }
 }
