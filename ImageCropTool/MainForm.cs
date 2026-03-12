@@ -124,21 +124,21 @@ namespace ImageCropTool
             listViewMain.SelectedIndexChanged += listViewMain_SelectedIndexChanged;
 
             // 우클릭 메뉴 객체 생성
-            lineContextMenu = new ContextMenuStrip();
+            //lineContextMenu = new ContextMenuStrip();
 
-            deleteLineItem = new ToolStripMenuItem("라인 삭제");
-            lineContextMenu.Items.Add(deleteLineItem);
+            //deleteLineItem = new ToolStripMenuItem("라인 삭제");
+            //lineContextMenu.Items.Add(deleteLineItem);
 
-            resetviewItem = new ToolStripMenuItem("줌핏");
-            lineContextMenu.Items.Add(resetviewItem);
+            //resetviewItem = new ToolStripMenuItem("줌핏");
+            //lineContextMenu.Items.Add(resetviewItem);
 
 
-            lineResetItem = new ToolStripMenuItem("라인 초기화");
-            lineContextMenu.Items.Add(lineResetItem);
+            //lineResetItem = new ToolStripMenuItem("라인 초기화");
+            //lineContextMenu.Items.Add(lineResetItem);
 
-            deleteLineItem.Click += (s, e) => DeleteLine(contextTargetLine);
-            resetviewItem.Click += (s, e) => ResetView();
-            lineResetItem.Click += (s, e) => TeachingReset();
+            //deleteLineItem.Click += (s, e) => DeleteLine(contextTargetLine);
+            //resetviewItem.Click += (s, e) => ResetView();
+            //lineResetItem.Click += (s, e) => TeachingReset();
         }
 
 
@@ -227,6 +227,9 @@ namespace ImageCropTool
 
             File.WriteAllText(jsonPath, json);
         }
+
+
+        /* =============== ListView ======== */
 
         private void ShowLineList()
         {
@@ -563,10 +566,6 @@ namespace ImageCropTool
                 await Task.Run(() =>
                 {
                     originalMat?.Dispose();
-
-                    //originalBitmap = new Bitmap(dlg.FileName);
-                    //originalMat = BitmapConverter.ToMat(originalBitmap);  // 연산용
-
                     originalMat = Cv2.ImRead(dlg.FileName, ImreadModes.Unchanged);
 
 
@@ -723,11 +722,11 @@ namespace ImageCropTool
                                     (int)originalPt.Y))
                                 {
                                     contextTargetLine = line;
-                                    deleteLineItem.Enabled = true;
-                                    lineContextMenu.Show(
-                                        pictureBoxImage,
-                                        e.Location
-                                    );
+                                    LineDelete.Enabled = true;
+                                    //lineContextMenu.Show(
+                                    //    pictureBoxImage,
+                                    //    e.Location
+                                    //);
                                     hitBox = true;
                                     break;
                                 }
@@ -738,8 +737,8 @@ namespace ImageCropTool
                         if (!hitBox)
                         {
                             contextTargetLine = null;
-                            deleteLineItem.Enabled = false;
-                            lineContextMenu.Show(pictureBoxImage, e.Location);
+                            LineDelete.Enabled = false;
+                            //lineContextMenu.Show(pictureBoxImage, e.Location);
                         }
                         lastMousePt = e.Location;
                         return;
@@ -843,7 +842,6 @@ namespace ImageCropTool
             // 3️ 이미지 영역 밖이면 중단
             if (!IsInsideImageScreen(e.Location))
             {
-                
                 return;
             }
 
@@ -909,7 +907,6 @@ namespace ImageCropTool
             GetBestLevel(out levelScale);
 
             renderer.ViewScale = viewScale * levelScale;
-            //renderer.BaseScale = 1.0f;
             renderer.ViewOffset = viewOffset;
 
             renderer.Draw(
@@ -1422,5 +1419,19 @@ namespace ImageCropTool
             //$"Managed: {managed / 1024 / 1024} MB";
         }
 
+        private void ZoomFit_Click(object sender, EventArgs e)
+        {
+            ResetView();
+        }
+
+        private void LineDelete_Click(object sender, EventArgs e)
+        {
+            DeleteLine(contextTargetLine);
+        }
+
+        private void ResetLine_Click(object sender, EventArgs e)
+        {
+            LineReset();
+        }
     }
 }

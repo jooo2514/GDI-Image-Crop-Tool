@@ -54,6 +54,9 @@ namespace ImageCropTool
             this.label4 = new System.Windows.Forms.Label();
             this.label1 = new System.Windows.Forms.Label();
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.ZoomFit = new System.Windows.Forms.ToolStripMenuItem();
+            this.LineDelete = new System.Windows.Forms.ToolStripMenuItem();
+            this.ResetLine = new System.Windows.Forms.ToolStripMenuItem();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxImage)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerMain)).BeginInit();
             this.splitContainerMain.Panel1.SuspendLayout();
@@ -65,15 +68,17 @@ namespace ImageCropTool
             this.groupCrop.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numCropSize)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxPreview)).BeginInit();
+            this.contextMenuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
             // pictureBoxImage
             // 
             this.pictureBoxImage.BackColor = System.Drawing.SystemColors.ActiveCaptionText;
+            this.pictureBoxImage.ContextMenuStrip = this.contextMenuStrip1;
             this.pictureBoxImage.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pictureBoxImage.Location = new System.Drawing.Point(0, 0);
             this.pictureBoxImage.Name = "pictureBoxImage";
-            this.pictureBoxImage.Size = new System.Drawing.Size(709, 843);
+            this.pictureBoxImage.Size = new System.Drawing.Size(707, 843);
             this.pictureBoxImage.TabIndex = 0;
             this.pictureBoxImage.TabStop = false;
             // 
@@ -93,7 +98,7 @@ namespace ImageCropTool
             this.splitContainerMain.Panel2.AccessibleName = "";
             this.splitContainerMain.Panel2.Controls.Add(this.panelRight);
             this.splitContainerMain.Size = new System.Drawing.Size(965, 843);
-            this.splitContainerMain.SplitterDistance = 709;
+            this.splitContainerMain.SplitterDistance = 707;
             this.splitContainerMain.SplitterWidth = 6;
             this.splitContainerMain.TabIndex = 2;
             // 
@@ -114,7 +119,7 @@ namespace ImageCropTool
             this.panelRight.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelRight.Location = new System.Drawing.Point(0, 0);
             this.panelRight.Name = "panelRight";
-            this.panelRight.Size = new System.Drawing.Size(250, 843);
+            this.panelRight.Size = new System.Drawing.Size(252, 843);
             this.panelRight.TabIndex = 0;
             // 
             // label5
@@ -144,7 +149,7 @@ namespace ImageCropTool
             this.groupInfo.Dock = System.Windows.Forms.DockStyle.Top;
             this.groupInfo.Location = new System.Drawing.Point(0, 95);
             this.groupInfo.Name = "groupInfo";
-            this.groupInfo.Size = new System.Drawing.Size(250, 68);
+            this.groupInfo.Size = new System.Drawing.Size(252, 68);
             this.groupInfo.TabIndex = 18;
             this.groupInfo.TabStop = false;
             this.groupInfo.Text = "Line Info";
@@ -202,7 +207,7 @@ namespace ImageCropTool
             this.groupCrop.Dock = System.Windows.Forms.DockStyle.Top;
             this.groupCrop.Location = new System.Drawing.Point(0, 15);
             this.groupCrop.Name = "groupCrop";
-            this.groupCrop.Size = new System.Drawing.Size(250, 65);
+            this.groupCrop.Size = new System.Drawing.Size(252, 65);
             this.groupCrop.TabIndex = 16;
             this.groupCrop.TabStop = false;
             this.groupCrop.Text = "Crop 설정";
@@ -316,8 +321,33 @@ namespace ImageCropTool
             // contextMenuStrip1
             // 
             this.contextMenuStrip1.ImageScalingSize = new System.Drawing.Size(20, 20);
+            this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.ZoomFit,
+            this.LineDelete,
+            this.ResetLine});
             this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(61, 4);
+            this.contextMenuStrip1.Size = new System.Drawing.Size(211, 104);
+            // 
+            // ZoomFit
+            // 
+            this.ZoomFit.Name = "ZoomFit";
+            this.ZoomFit.Size = new System.Drawing.Size(210, 24);
+            this.ZoomFit.Text = "줌핏";
+            this.ZoomFit.Click += new System.EventHandler(this.ZoomFit_Click);
+            // 
+            // LineDelete
+            // 
+            this.LineDelete.Name = "LineDelete";
+            this.LineDelete.Size = new System.Drawing.Size(210, 24);
+            this.LineDelete.Text = "라인 삭제";
+            this.LineDelete.Click += new System.EventHandler(this.LineDelete_Click);
+            // 
+            // ResetLine
+            // 
+            this.ResetLine.Name = "ResetLine";
+            this.ResetLine.Size = new System.Drawing.Size(210, 24);
+            this.ResetLine.Text = "라인 초기화";
+            this.ResetLine.Click += new System.EventHandler(this.ResetLine_Click);
             // 
             // MainForm
             // 
@@ -342,6 +372,7 @@ namespace ImageCropTool
             this.groupCrop.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numCropSize)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBoxPreview)).EndInit();
+            this.contextMenuStrip1.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -370,6 +401,9 @@ namespace ImageCropTool
         private System.Windows.Forms.GroupBox groupCrop;
         private System.Windows.Forms.NumericUpDown numCropSize;
         private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.ToolStripMenuItem ZoomFit;
+        private System.Windows.Forms.ToolStripMenuItem LineDelete;
+        private System.Windows.Forms.ToolStripMenuItem ResetLine;
     }
 }
 
